@@ -1,6 +1,8 @@
 package com.fjy.framework.servlet;
 
+import com.fjy.framework.anotation.FAutowired;
 import com.fjy.framework.anotation.FController;
+import com.fjy.framework.anotation.FRequestMapping;
 import com.fjy.framework.anotation.FService;
 
 import javax.servlet.ServletConfig;
@@ -144,22 +146,125 @@ public class FDispatcherServlet extends HttpServlet {
         for (Map.Entry<String, Object> entry : ioc.entrySet()) {
             //拿到实例对象中的所有属性
             Field[] fields = entry.getValue().getClass().getDeclaredFields();
-            for ()
+            for (Field field : fields) {
+                if (!field.isAnnotationPresent(FAutowired.class)) {continue;}
+
+                FAutowired autowired = field.getAnnotation(FAutowired.class);
+                String beanName = autowired.value().trim();
+                if ("".equals(beanName)) {
+                    beanName = field.getType().getName();
+                }
+                field.setAccessible(true);  //设置私有属性的访问权限
+                try {
+                    field.set(entry.getValue(), ioc.get(beanName));
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    continue;
+                }
+            }
 
         }
     }
 
     private void initHandlerMapping() {
+        if (ioc.isEmpty()) return;
+
+        for (Map.Entry<String, Object> entry : ioc.entrySet()) {
+            Class<?> clazz = entry.getValue().getClass();
+            if (!clazz.isAnnotationPresent(FController.class)) continue;
+
+            String baseUrl = "";
+            //获取controller的url配置
+            if (clazz.isAnnotationPresent(FRequestMapping.class)) {
+                FRequestMapping requestMapping = clazz.getAnnotation(FRequestMapping.class);
+                baseUrl = requestMapping.value();
+            }
+
+            //获取method的url的配置
+            Method[] methods = clazz.getMethods();
+            for (Method method : methods) {
+                //忽略非FRequestMapping的注解
+                if (!method.isAnnotationPresent(FRequestMapping.class)) continue;
+
+                //映射URL
+                FRequestMapping requestMapping = method.getAnnotation(FRequestMapping.class);
+                String url = ("/" + baseUrl + "/" + requestMapping.value().replaceAll("/+", "/"));
+                handlerMapping.put(url, method);
+                System.out.println("mapped" + url + "," + method);
+            }
+        }
     }
 
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+
+
+
         super.doGet(req, resp);
     }
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        try {
+            doDispatch(req, resp);
+        } catch (Exception e) {
+            resp.getWriter().write("500 Exception, Details:\r\n" + Arrays.toString(e.getStackTrace())
+                    .replaceAll("\\[|\\]", "").replaceAll(",\\s", "\r\n"));
+        }
+
         super.doPost(req, resp);
+    }
+
+    private void doDispatch(HttpServletRequest req, HttpServletResponse resp) throws Exception{
+        if (this.handlerMapping.isEmpty()) {
+            return;
+        }
+
+        String url = req.getRequestURI();
+        String contextPath = req.getContextPath();
+        url = url.replace(contextPath, "").replaceAll("/+", "/");
+
+        if (!this.handlerMapping.containsKey(url)) {
+            resp.getWriter().write("404 Not Found!!");
+            return;
+        }
+
+        Map<String, String[]> params = req.getParameterMap();
+        Method method = this.handlerMapping.get(url);
+
+        //获取方法的参数列表
+        Class<?>[] parameterTypes = method.getParameterTypes();
+
+        //获取请求的参数列表
+        Map<String, String[]> parameterMap = req.getParameterMap();
+        //保存参数值
+        Object[] paramValues = new Object[parameterTypes.length];
+        //方法的参数列表
+        for (int i = 0; i < parameterTypes.length; ++i) {
+            //
+            Class parameterType = parameterTypes[i];
+            if (parameterType == HttpServletRequest.class) {
+                paramValues[i] = req;
+                continue;
+            } else if (parameterType == HttpServletResponse.class) {
+                paramValues[i] = resp;
+                continue;
+            } else if (parameterType == String.class) {
+                for (Map.Entry<String, String[]> param : parameterMap.entrySet()) {
+                    String value = Arrays.toString(param.getValue())
+                            .replaceAll("\\[|\\]", "")
+                            .replaceAll(",\\s", "");
+                    paramValues[i] = value;
+                }
+            }
+        }
+        try {
+            String beanName = lowerFirstCase(method.getDeclaringClass().getSimpleName());
+
+            method.invoke(this.ioc.get(beanName), paramValues);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
