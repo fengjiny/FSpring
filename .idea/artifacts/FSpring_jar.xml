@@ -1,0 +1,9 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="FSpring:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/FSpring_jar</output-path>
+    <root id="archive" name="FSpring.jar">
+      <element id="module-output" name="FSpring" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.16.20/lombok-1.16.20.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>

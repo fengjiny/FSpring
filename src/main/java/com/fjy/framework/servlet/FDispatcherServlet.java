@@ -60,8 +60,27 @@ public class FDispatcherServlet extends HttpServlet {
         //构造HandlerMapping
         initHandlerMapping();
 
-        System.out.println("My mvcframework is init");
+        System.out.println("My mvc framework is init");
 //        super.init();
+    }
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+
+
+
+        super.doGet(req, resp);
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        try {
+            doDispatch(req, resp);
+        } catch (Exception e) {
+            resp.getWriter().write("500 Exception, Details:\r\n" + Arrays.toString(e.getStackTrace())
+                    .replaceAll("\\[|\\]", "").replaceAll(",\\s", "\r\n"));
+        }
+//        super.doPost(req, resp);
     }
 
     private void doLoadConfig(String location) {
@@ -162,7 +181,6 @@ public class FDispatcherServlet extends HttpServlet {
                     continue;
                 }
             }
-
         }
     }
 
@@ -188,33 +206,13 @@ public class FDispatcherServlet extends HttpServlet {
 
                 //映射URL
                 FRequestMapping requestMapping = method.getAnnotation(FRequestMapping.class);
-                String url = ("/" + baseUrl + "/" + requestMapping.value().replaceAll("/+", "/"));
+                String url = (baseUrl + requestMapping.value().replaceAll("/+", "/"));
                 handlerMapping.put(url, method);
                 System.out.println("mapped" + url + "," + method);
             }
         }
     }
 
-
-    @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-
-
-
-        super.doGet(req, resp);
-    }
-
-    @Override
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        try {
-            doDispatch(req, resp);
-        } catch (Exception e) {
-            resp.getWriter().write("500 Exception, Details:\r\n" + Arrays.toString(e.getStackTrace())
-                    .replaceAll("\\[|\\]", "").replaceAll(",\\s", "\r\n"));
-        }
-
-        super.doPost(req, resp);
-    }
 
     private void doDispatch(HttpServletRequest req, HttpServletResponse resp) throws Exception{
         if (this.handlerMapping.isEmpty()) {
